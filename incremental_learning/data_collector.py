@@ -1,0 +1,152 @@
+import cv2
+import numpy as np
+import mss
+import time
+from keras._tf_keras.keras.models import load_model
+from keras.src.legacy.preprocessing.image import ImageDataGenerator
+from user_feedback import ask_user_for_feedback
+from constants import class_indexes, class_names
+import os
+import shutil
+from PIL import Image
+import matplotlib.pyplot as plt
+
+print("Loading model...")
+# The arguement here should reference the model we trained in the last module
+model = load_model("low_vision_minecraft_classifier_test.keras")
+print("Model loaded")
+
+# Resize and split data into training and validation (This should be the same as values used last time)
+image_size = (160, 160)
+image_data_generator = ImageDataGenerator(
+    rescale=1./255,
+    validation_split=0.2,
+)
+
+# Freeze all layers in the neural network except the last two, these are the ones we want to fine tune
+for layer in model.layers[:-2]:
+    layer.trainable = False
+
+# A temporary directory new, labelled screenshots will get saved to before the model is fine-tuned
+temp_directory = "temp_data"
+
+# Initialise the screenshot tool
+screen_capture_tool = mss.mss()
+primary_screen = screen_capture_tool.monitors[0]
+
+# A function used to know when the program should fine tune the model, or collect more data
+def validate_temp_data(min_number_of_images):
+    class_folder_count = 0
+    total_images = 0
+
+    for class_name in class_names.values():
+        class_directory = os.path.join(temp_directory, class_name)
+
+        if os.path.exists(class_directory):
+            class_folder_count += 1
+            num_images_in_class = len([file for file in os.listdir(class_directory)]) 
+            total_images += num_images_in_class
+    
+    return class_folder_count == len(class_names) and total_images >= min_number_of_images
+
+def fine_tune_model():
+    print("Fine tuning model...")
+
+    new_data_generator = ImageDataGenerator(
+        rescale=1./255,
+        validation_split=0.2
+    )
+
+    new_training_data = new_data_generator.flow_from_directory(
+        temp_directory,
+        target_size=image_size,
+        batch_size=2,
+        class_mode='categorical',
+        subset='training'
+    )
+
+    new_validation_data = new_data_generator.flow_from_directory(
+        temp_directory,
+        target_size=image_size,
+        batch_size=2,
+        class_mode='categorical',
+        subset='validation'
+    )
+    
+    history = model.fit(
+        new_training_data,
+        validation_data=new_validation_data, 
+        epochs=5,
+        verbose=1
+    )
+
+    print('Saving model...')
+    model.save("models/updated_low_vision_classifier.keras")
+    print('Model saved at: models/updated_low_vision_classifier.keras')
+
+    # Plot accuracy during training
+    plt.plot(history.history['accuracy'], label='Training Accuracy')
+    plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+    plt.title('Model Accuracy')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+# Plot loss function during training
+    plt.plot(history.history['loss'], label='Training Loss')
+    plt.plot(history.history['val_loss'], label='Validation Loss')
+    plt.title('Model Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+# Start a continuous loop
+while True:
+    if (validate_temp_data(34)):
+        fine_tune_model()
+        # Remove the temp_data directory once the model has been fine tuned with the images inside it
+        shutil.rmtree("temp_data")
+
+    # Run the loop every 5 seconds
+    time.sleep(5)
+
+    # Take the screenshot
+    screenshot = screen_capture_tool.grab(primary_screen)
+    
+    # Convert to PIL Image if needed
+    if not isinstance(screenshot, Image.Image):
+        screenshot = Image.fromarray(np.asarray(screenshot))
+
+    # Convert image to a NumPy array with the shape expected by the model (0, 160, 160, 3)
+    screenshot = screenshot.convert("RGB")
+    screenshot = screenshot.resize(image_size)
+    image_array = np.asarray(screenshot).astype(np.float32) # Convert the screenshot to a NumPy array with float32 dtype
+
+    # Pre process the screenshot so its ready to be passed into our model
+    image = image_data_generator.standardize(image_array)
+
+    # Add batch dimension
+    image = np.expand_dims(image, axis=0)
+
+    # Make a prediction based on this screenshot
+    predictions = model.predict(image)
+    
+    # Get the predicted class with the highest probability
+    predicted_class = np.argmax(predictions, axis=1)[0]
+
+    print(f"Predicted class: {class_names[predicted_class]}")
+    
+    if predicted_class != class_indexes['non_low_vision']: 
+        ask_user_for_feedback(predicted_class, screenshot)
+    else:
+      print("non_low_vision detected")
+
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cv2.destroyAllWindows()
