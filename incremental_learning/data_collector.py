@@ -9,7 +9,6 @@ from constants import class_indexes, class_names
 import os
 import shutil
 from PIL import Image
-import matplotlib.pyplot as plt
 
 print("Loading model...")
 # The arguement here should reference the model we trained in the last module
@@ -83,26 +82,6 @@ def fine_tune_model():
     print('Saving model...')
     model.save("models/updated_low_vision_classifier.keras")
     print('Model saved at: models/updated_low_vision_classifier.keras')
-
-    # Plot accuracy during training
-    plt.plot(history.history['accuracy'], label='Training Accuracy')
-    plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
-    plt.title('Model Accuracy')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-# Plot loss function during training
-    plt.plot(history.history['loss'], label='Training Loss')
-    plt.plot(history.history['val_loss'], label='Validation Loss')
-    plt.title('Model Loss')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
 
 # Start a continuous loop
 while True:
