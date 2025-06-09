@@ -11,9 +11,6 @@ class LowVisionFeedback:
           self.pil_image = screenshot.resize((400, 300))
           self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-      def ask_for_feedback(self):
-           self.create_feedback_window()
-
       # Reusable function to create a pop up window 
       def show_input_modal(self, title, prompt_text, on_submit, with_image=False):
           # Create a new top-level window using the tkinter library
@@ -138,6 +135,9 @@ class LowVisionFeedback:
 
         self.pil_image.save(temp_filename)
         print(f"Screenshot saved to {temp_filename}")
+
+      def ask_for_feedback(self):
+           self.create_feedback_window()
 
 
 def ask_user_for_feedback(predicted_class, screenshot):

@@ -1,18 +1,17 @@
-import cv2
+from incremental_learning.fine_tune_model_utils import fine_tune_model, validate_temp_data
+from incremental_learning.constants import class_indexes, class_names
+from actions.actions_utils import handleLowVision
 import numpy as np
 import mss
 import time
 from keras._tf_keras.keras.models import load_model
 from keras.src.legacy.preprocessing.image import ImageDataGenerator
-from user_feedback import ask_user_for_feedback
-from constants import class_indexes, class_names
-from fine_tune_model_utils import fine_tune_model, validate_temp_data
 import shutil
 from PIL import Image
 
 print("Loading model...")
 # The arguement here should reference the model we trained in the last module
-model = load_model("low_vision_minecraft_classifier")
+model = load_model("models/updated_low_vision_classifier.keras")
 print("Model loaded")
 
 # Resize and split data into training and validation (This should be the same as values used last time)
@@ -68,14 +67,8 @@ while True:
     predicted_class = np.argmax(predictions, axis=1)[0]
 
     print(f"Predicted class: {class_names[predicted_class]}")
-    
+
     if predicted_class != class_indexes['non_low_vision']: 
-        ask_user_for_feedback(predicted_class, screenshot)
+        handleLowVision(class_names[predicted_class], screenshot)
     else:
       print("non_low_vision detected")
-
-
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-cv2.destroyAllWindows()
